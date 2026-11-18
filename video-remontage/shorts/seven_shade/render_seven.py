@@ -102,6 +102,85 @@ F_OVER = ImageFont.truetype(FD + "Inter-SemiBold.otf", 30)
 SS, IW = R.SS, R.IW
 col, ease, clamp, lerp = R.col, R.ease, R.clamp, R.lerp
 LINE, ACC = R.LINE, R.GOLD
+CARD, SHADOW = R.CARD, R.PAL["shadow"]
+
+# Calm palette per scene: bg top, bg bottom, accent, glow
+SCENE_PAL = {
+    "hook": ((40, 31, 30), (14, 12, 14), (240, 202, 150), (96, 64, 42)),     # warm dusk
+    "q":    ((18, 32, 40), (9, 17, 23), (128, 198, 184), (40, 84, 88)),      # deep teal
+    "1":    ((22, 30, 48), (10, 14, 26), (156, 184, 232), (44, 62, 104)),    # slate blue
+    "2":    ((22, 34, 28), (10, 16, 13), (172, 212, 160), (50, 86, 60)),     # sage
+    "3":    ((18, 30, 44), (8, 13, 23), (140, 204, 212), (38, 78, 96)),      # lagoon
+    "4":    ((40, 26, 36), (16, 11, 17), (232, 176, 194), (92, 52, 74)),     # dusty rose
+    "5":    ((28, 26, 48), (12, 11, 24), (192, 174, 232), (66, 58, 108)),    # night violet
+    "6":    ((36, 32, 24), (14, 13, 10), (226, 202, 152), (86, 72, 46)),     # warm sand
+    "7":    ((16, 28, 46), (7, 13, 24), (144, 194, 238), (36, 64, 106)),     # ocean blue
+    "src":  ((24, 30, 34), (11, 14, 16), (196, 214, 204), (56, 70, 72)),     # misty grey
+    "cta":  ((34, 29, 48), (14, 12, 22), (238, 204, 172), (90, 68, 92)),     # dawn
+}
+
+
+def mix(c0, c1, k):
+    return tuple(c0[i] + (c1[i] - c0[i]) * k for i in range(3))
+
+
+def palette_at(si, lt):
+    cur = SCENE_PAL[SEGMENTS[si][0]]
+    if si == 0:
+        return cur
+    prev = SCENE_PAL[SEGMENTS[si - 1][0]]
+    k = R.ease_io(lt / 0.9)
+    return tuple(mix(a, b, k) for a, b in zip(prev, cur))
+
+
+def apply_palette(pal):
+    global ACC, LINE, CARD, SHADOW
+    bg0, bg1, acc, glow = pal
+    ACC = tuple(int(v) for v in acc)
+    LINE = tuple(int(v) for v in mix(mix(acc, (205, 205, 205), 0.4), (0, 0, 0), 0.18))
+    CARD = tuple(int(v) for v in mix(bg0, (255, 255, 255), 0.06))
+    SHADOW = tuple(int(v) for v in mix(bg0, (255, 255, 255), 0.28))
+    R.GOLD, R.LINE, R.CARD = ACC, LINE, CARD
+    R.INK_ON_ACC = tuple(int(v) for v in bg1)
+    R.PAL["bg1"] = R.INK_ON_ACC
+
+
+GRAD = (R.yy[:, :1] / H)[..., None]  # (H,1,1)
+
+
+def background(t, pal, glow_k):
+    bg0, bg1, acc, glow = (np.array(c, np.float32) for c in pal)
+    img = bg0 * (1 - GRAD) + bg1 * GRAD                      # (H,1,3) -> broadcast
+    img = np.broadcast_to(img, (H, W, 3)).copy()
+    m1 = np.clip(R.GLOW * 0.75 * glow_k, 0, 1)
+    img = img * (1 - m1) + glow * m1
+    m2 = np.clip(R.GLOW2 * 0.3, 0, 1)
+    img = img * (1 - m2) + (glow * 0.6 + bg0 * 0.4) * m2
+    img = img * R.VIG
+    gr = R.GRAIN[int(t * 15) % 6]
+    img += np.repeat(np.repeat(gr, 2, 0), 2, 1)[..., None]
+    return Image.fromarray(np.clip(img, 0, 255).astype(np.uint8)).convert("RGBA")
+
+
+BOKEH = np.random.default_rng(11).random((14, 5))
+
+
+def bokeh(frame, t):
+    lay = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    d = ImageDraw.Draw(lay)
+    for bx, by, sp, sz, ph in BOKEH:
+        x = (bx * W + 40 * math.sin(t * 0.15 + ph * 6)) % W
+        y = (by * H - t * (6 + 10 * sp)) % H
+        r = 30 + 70 * sz
+        tw = 0.5 + 0.5 * math.sin(t * 0.6 + ph * 9)
+        for k in range(4, 0, -1):
+            rr = r * k / 4
+            d.ellipse((x - rr, y - rr, x + rr, y + rr), fill=col(ACC, 0.018 * tw))
+    frame.alpha_composite(lay)
+
+
+def gdot(d, x, y, rad, a):
+    R.glow_dot(d, x, y, rad, a, core=ACC)
 
 
 def arc_pts(cx, cy, rx, ry, a0, a1, n=80):
@@ -141,7 +220,7 @@ def draw_icon(kind, lt, dur, a):
             pts = arc_pts(c, top + arch, arcw * (1 + k * 0.06), arch * (1 + k * 0.08), math.pi, 2 * math.pi)
             d.polygon(pts + [(c + arcw, top + arch + 420 * u), (c - arcw, top + arch + 420 * u)], fill=col(ACC, a * 0.025))
         d.line(arc_pts(c, top + arch, arcw, arch, math.pi, 2 * math.pi), fill=col(ACC, a), width=int(3 * u), joint="curve")
-        R.glow_dot(d, c, top + 20 * u, 22 * u, a)
+        gdot(d, c, top + 20 * u, 22 * u, a)
         base = top + arch + 300 * u
         shown = 7 if full else clamp((lt - 0.8) / 2.5) * 7
         for i in range(7):
@@ -150,7 +229,7 @@ def draw_icon(kind, lt, dur, a):
             yy = base - 60 * u * math.sin(math.pi * (i / 6)) * 0.4
             r = 16 * u
             if q > 0:
-                R.glow_dot(d, x, yy, r * (0.6 + 0.4 * ease(q)), a * ease(q))
+                gdot(d, x, yy, r * (0.6 + 0.4 * ease(q)), a * ease(q))
             else:
                 d.ellipse((x - r, yy - r, x + r, yy + r), outline=col(LINE, a * 0.35), width=int(2 * u))
         if full:
@@ -170,7 +249,7 @@ def draw_icon(kind, lt, dur, a):
         top = c - 230 * u
         d.line((c, top, c, c + 260 * u), fill=col(LINE, a), width=int(3 * u))
         d.line((c - 120 * u, c + 260 * u, c + 120 * u, c + 260 * u), fill=col(LINE, a), width=int(3 * u))
-        R.glow_dot(d, c, top - 10 * u, 16 * u, a)
+        gdot(d, c, top - 10 * u, 16 * u, a)
         L = 300 * u
         for side in (-1, 1):
             ex, ey = c + side * L * math.cos(ang), top + 30 * u + side * L * math.sin(ang)
@@ -178,7 +257,7 @@ def draw_icon(kind, lt, dur, a):
             py = ey + 170 * u
             d.line((ex, ey, ex - 80 * u, py), fill=col(LINE, a * 0.7), width=int(2 * u))
             d.line((ex, ey, ex + 80 * u, py), fill=col(LINE, a * 0.7), width=int(2 * u))
-            d.chord((ex - 100 * u, py - 40 * u, ex + 100 * u, py + 40 * u), 0, 180, fill=col(R.CARD, a), outline=col(ACC, a), width=int(3 * u))
+            d.chord((ex - 100 * u, py - 40 * u, ex + 100 * u, py + 40 * u), 0, 180, fill=col(CARD, a), outline=col(ACC, a), width=int(3 * u))
     elif kind == "sprout":
         g = ease(lt / 2.2)
         base = c + 320 * u
@@ -194,7 +273,7 @@ def draw_icon(kind, lt, dur, a):
             sz = 90 * u * ease(q)
             leaf = [(x, y), (x + side * sz * 0.6, y - sz * 0.55), (x + side * sz * 1.2, y - sz * 0.2), (x + side * sz * 0.6, y + sz * 0.05)]
             d.polygon(leaf, fill=col(ACC, a * 0.25), outline=col(ACC, a))
-        R.glow_dot(d, pts[-1][0], pts[-1][1], 14 * u, a)
+        gdot(d, pts[-1][0], pts[-1][1], 14 * u, a)
     elif kind == "mosque":
         dp = clamp(lt / 1.6)
         base = c + 300 * u
@@ -213,7 +292,7 @@ def draw_icon(kind, lt, dur, a):
         door = (c - 70 * u, base - 190 * u, c + 70 * u, base)
         d.rounded_rectangle(door, 70 * u, outline=col(LINE, a * 0.8), width=lw)
         hb = 1 + 0.12 * math.sin(lt * 5) * math.sin(lt * 5)
-        R.glow_dot(d, c, base - 300 * u, 24 * u * hb, a)
+        gdot(d, c, base - 300 * u, 24 * u * hb, a)
         for k in range(3):
             f = (lt * 0.6 + k / 3) % 1
             rr = (30 + 140 * f) * u
@@ -225,12 +304,12 @@ def draw_icon(kind, lt, dur, a):
         x1, x2 = c - sep, c + sep
         d.line((x1, y, x2, y), fill=col(ACC, a * 0.6), width=int(2 * u))
         d.arc((c - 420 * u, c - 300 * u, c + 420 * u, c + 300 * u), 200, 340, fill=col(LINE, a * 0.35), width=int(2 * u))
-        R.glow_dot(d, x1, y, 30 * u, a)
-        R.glow_dot(d, x2, y, 30 * u, a)
+        gdot(d, x1, y, 30 * u, a)
+        gdot(d, x2, y, 30 * u, a)
         close = 1 - clamp(sep / (120 * u))
         if close > 0:
-            R.glow_dot(d, c, y, 60 * u * close, a * close * 0.6)
-        R.glow_dot(d, c, c - 300 * u, 16 * u, a * 0.9)
+            gdot(d, c, y, 60 * u * close, a * close * 0.6)
+        gdot(d, c, c - 300 * u, 16 * u, a * 0.9)
         d.line((c, c - 280 * u, x1, y), fill=col(ACC, a * 0.25), width=int(2 * u))
         d.line((c, c - 280 * u, x2, y), fill=col(ACC, a * 0.25), width=int(2 * u))
     elif kind == "turn":
@@ -238,10 +317,10 @@ def draw_icon(kind, lt, dur, a):
         lx = c - 260 * u
         for k in range(6, 0, -1):
             rr = 70 * u * (1 + k * 0.3)
-            d.ellipse((lx - rr, c - rr, lx + rr, c + rr), fill=col(R.PAL["shadow"], a * 0.05))
-        d.ellipse((lx - 70 * u, c - 70 * u, lx + 70 * u, c + 70 * u), outline=col(R.PAL["shadow"], a * 0.8), width=lw)
+            d.ellipse((lx - rr, c - rr, lx + rr, c + rr), fill=col(SHADOW, a * 0.05))
+        d.ellipse((lx - 70 * u, c - 70 * u, lx + 70 * u, c + 70 * u), outline=col(SHADOW, a * 0.8), width=lw)
         rx = c + 300 * u
-        R.glow_dot(d, rx, c, (26 + 14 * m) * u, a)
+        gdot(d, rx, c, (26 + 14 * m) * u, a)
         x = lerp(c - 120 * u, c + 180 * u, m)
         for k in range(12):
             tx = lerp(c - 120 * u, x, k / 11)
@@ -255,13 +334,13 @@ def draw_icon(kind, lt, dur, a):
             d.line((c - 6 * u, c + yy * u, c + 6 * u, c + yy * u), fill=col(LINE, a * 0.25), width=int(1 * u))
         for side, alpha in ((-1, 0.3), (1, 1.0)):
             x = c + side * 220 * u
-            d.rounded_rectangle((x - 110 * u, c - 60 * u, x + 110 * u, c + 70 * u), 50 * u, fill=col(R.CARD, a * alpha), outline=col(ACC if side > 0 else LINE, a * alpha), width=lw)
+            d.rounded_rectangle((x - 110 * u, c - 60 * u, x + 110 * u, c + 70 * u), 50 * u, fill=col(CARD, a * alpha), outline=col(ACC if side > 0 else LINE, a * alpha), width=lw)
             for f in range(4):
                 fx = x - 75 * u + f * 50 * u
-                d.rounded_rectangle((fx - 18 * u, c - 130 * u, fx + 18 * u, c - 40 * u), 18 * u, fill=col(R.CARD, a * alpha), outline=col(ACC if side > 0 else LINE, a * alpha), width=int(2 * u))
+                d.rounded_rectangle((fx - 18 * u, c - 130 * u, fx + 18 * u, c - 40 * u), 18 * u, fill=col(CARD, a * alpha), outline=col(ACC if side > 0 else LINE, a * alpha), width=int(2 * u))
         f = (lt * 0.55) % 1
         cx_, cy_ = c + 220 * u, c + 80 * u + 170 * u * ease(f)
-        R.glow_dot(d, cx_, cy_, 22 * u, a * (1 - clamp((f - 0.8) / 0.2)))
+        gdot(d, cx_, cy_, 22 * u, a * (1 - clamp((f - 0.8) / 0.2)))
         d.rounded_rectangle((c + 130 * u, c + 270 * u, c + 310 * u, c + 290 * u), 8 * u, outline=col(LINE, a * 0.6), width=int(2 * u))
     elif kind == "eye":
         op = ease(lt / 0.8)
@@ -270,7 +349,7 @@ def draw_icon(kind, lt, dur, a):
         d.line(arc_pts(ex, ey - eh * 0.9, ew, eh * 1.6, math.pi * 0.18, math.pi * 0.82), fill=col(LINE, a), width=int(3 * u), joint="curve")
         ir = 70 * u * op
         d.ellipse((ex - ir, ey - ir, ex + ir, ey + ir), outline=col(ACC, a), width=int(3 * u))
-        R.glow_dot(d, ex, ey, 26 * u * op, a)
+        gdot(d, ex, ey, 26 * u * op, a)
         for k in range(2):
             f = ((lt - 1.0) * 0.45 + k * 0.5) % 1 if lt > 1.0 else -1
             if f < 0: continue
@@ -284,12 +363,12 @@ def draw_icon(kind, lt, dur, a):
         for side in (-1, 1):
             xo = c + side * 320 * u * op
             pts = [(c, y0 + 20 * u), (xo, y0), (xo, y1), (c, y1 + 20 * u)]
-            d.polygon(pts, fill=col(R.CARD, a * 0.9), outline=col(ACC, a))
+            d.polygon(pts, fill=col(CARD, a * 0.9), outline=col(ACC, a))
             for k in range(6):
                 ly = y0 + 60 * u + k * 42 * u
                 d.line((c + side * 40 * u, ly + 6 * u, c + side * (40 + 220 * op) * u, ly), fill=col(LINE, a * 0.45), width=int(2 * u))
         d.line((c, y0 + 20 * u, c, y1 + 20 * u), fill=col(ACC, a), width=int(3 * u))
-        R.glow_dot(d, c, y0 - 70 * u, 16 * u, a)
+        gdot(d, c, y0 - 70 * u, 16 * u, a)
         f = R.sfont(FD + "Inter-SemiBold.otf", int(40 * u))
         R.text_center(d, c, y1 + 110 * u, "аль-Бухари № 660 · Муслим № 1031", f, col(R.CREAM, a * 0.9))
     return lay.resize((IW, IW), Image.LANCZOS)
@@ -307,7 +386,10 @@ def render(fi):
     last = si == len(SCENES) - 1
     a_out = 1 - R.ease_io((t - (DUR - 0.7)) / 0.7) if last else 1 - R.ease_io((lt - (dur - 0.28)) / 0.28)
     a = ease(lt / 0.4) * a_out
-    frame = R.background(t, 0.6 + 0.4 * a, 0.0, 0.0)
+    pal = palette_at(si, lt)
+    apply_palette(pal)
+    frame = background(t, pal, 0.6 + 0.4 * a)
+    bokeh(frame, t)
     if kind == "sun":
         arr = np.asarray(frame, dtype=np.float32)[..., :3]
         m = np.clip(SUN_MASK * 0.55 * a * ease(lt / 2.5), 0, 1)
