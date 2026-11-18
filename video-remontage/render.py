@@ -15,9 +15,11 @@ F_CARD = ImageFont.truetype(FD + "Inter-Bold.otf", 46)
 F_TAG = ImageFont.truetype(FD + "InterDisplay-Bold.otf", 120)
 F_SMALL = ImageFont.truetype(FD + "Inter-Medium.otf", 30)
 
-GOLD = (243, 196, 109)
-CREAM = (250, 244, 232)
-LINE = (236, 214, 170)
+GOLD = (146, 112, 214)   # lilac accent
+CREAM = (40, 38, 52)     # graphite text
+LINE = (92, 86, 112)     # slate lines
+CARD = (252, 251, 255)
+INK_ON_ACC = (255, 255, 255)
 CX, CY = W // 2, 700          # icon centre
 TITLE_Y = 1150
 SUB_Y = 1530
@@ -99,19 +101,25 @@ def scene_at(t):
 yy, xx = np.mgrid[0:H, 0:W].astype(np.float32)
 BASE = np.zeros((H, W, 3), np.float32)
 g = yy / H
-for k, (c0, c1) in enumerate(zip((10, 13, 24), (6, 8, 14))):
+for k, (c0, c1) in enumerate(zip((238, 237, 242), (219, 218, 226))):
     BASE[..., k] = lerp(c0, c1, g)
 r = np.sqrt((xx - CX) ** 2 + ((yy - CY) * 0.85) ** 2)
-GLOW = np.exp(-(r / 430) ** 2)[..., None] * np.array(GOLD, np.float32)[None, None] / 255
-GLOW2 = np.exp(-(r / 900) ** 2)[..., None] * np.array((120, 110, 160), np.float32)[None, None] / 255
+GLOW = np.exp(-(r / 430) ** 2)[..., None]
+GLOW2 = np.exp(-(r / 900) ** 2)[..., None]
+LIL = np.array((206, 186, 245), np.float32)[None, None]
+WHITE = np.array((252, 251, 255), np.float32)[None, None]
 vig = np.sqrt(((xx - W / 2) / (W * 0.75)) ** 2 + ((yy - H / 2) / (H * 0.7)) ** 2)
-VIG = np.clip(1 - 0.55 * vig ** 2, 0.25, 1)[..., None]
+VIG = np.clip(1 - 0.18 * vig ** 2, 0.7, 1)[..., None]
 rng = np.random.default_rng(7)
-GRAIN = [rng.normal(0, 4.0, (H // 2, W // 2)).astype(np.float32) for _ in range(6)]
+GRAIN = [rng.normal(0, 2.5, (H // 2, W // 2)).astype(np.float32) for _ in range(6)]
 PART = rng.random((70, 4))  # x, y, speed, size
 
 def background(t, glow_k, dark_k, bright_k):
-    img = BASE * (1 - 0.45 * dark_k) + GLOW * (38 * glow_k + 140 * bright_k) + GLOW2 * (30 * (1 - dark_k) + 60 * bright_k)
+    img = BASE * (1 - 0.28 * dark_k)
+    m1 = np.clip(GLOW * (0.28 * glow_k + 0.55 * bright_k), 0, 1)
+    img = img * (1 - m1) + LIL * m1
+    m2 = np.clip(GLOW2 * (0.35 * (1 - dark_k) + 0.4 * bright_k), 0, 1)
+    img = img * (1 - m2) + WHITE * m2
     img = img * VIG
     gr = GRAIN[int(t * 15) % 6]
     img += np.repeat(np.repeat(gr, 2, 0), 2, 1)[..., None]
@@ -123,7 +131,7 @@ def particles(d, t, a):
         x = px * W + 18 * math.sin(t * 0.4 + py * 20)
         tw = 0.5 + 0.5 * math.sin(t * (1 + sp * 2) + px * 30)
         rr = 1.2 + 2.2 * sz
-        d.ellipse((x - rr, y - rr, x + rr, y + rr), fill=col(LINE, a * (0.08 + 0.25 * tw)))
+        d.ellipse((x - rr, y - rr, x + rr, y + rr), fill=col(GOLD, a * (0.10 + 0.30 * tw)))
 
 # ---------------------------------------------------------------- icon drawing (on 2x supersampled layer)
 SS = 2
@@ -159,7 +167,7 @@ def rot_poly(cx, cy, w, h, ang):
 
 def card_poly(d, cx, cy, w, h, ang, a, fill_a=0.55):
     pts = rot_poly(cx, cy, w, h, ang)
-    d.polygon(pts, fill=(22, 24, 34, int(255 * a * fill_a)))
+    d.polygon(pts, fill=(CARD[0], CARD[1], CARD[2], int(255 * a * min(1, fill_a + 0.3))))
     d.line(pts + [pts[0]], fill=col(LINE, a * 0.9), width=int(2.2 * SS), joint="curve")
 
 def text_center(d, x, y, s, font, fill):
@@ -225,14 +233,14 @@ def draw_icon(kind, lt, dur, a, t, extra):
             sc = 1 + 0.08 * hi
             box = (x - cw / 2 * sc, c - ch / 2 * sc, x + cw / 2 * sc, c + ch / 2 * sc)
             if idx == 1 and sep < 5 * u: continue
-            fill = (int(lerp(22, GOLD[0], hi)), int(lerp(24, GOLD[1], hi)), int(lerp(34, GOLD[2], hi)), int(255 * a * lerp(0.6, 0.95, hi)))
+            fill = (int(lerp(CARD[0], GOLD[0], hi)), int(lerp(CARD[1], GOLD[1], hi)), int(lerp(CARD[2], GOLD[2], hi)), int(255 * a * lerp(0.85, 0.97, hi)))
             rrect(d, box, 36 * u, a * (0.9 if idx == 0 or hi else 0.45), fill=fill)
             # diamond glyph
             gx, gy, gr = x, c - 40 * u, 38 * u * sc
-            d.polygon([(gx, gy - gr), (gx + gr, gy), (gx, gy + gr), (gx - gr, gy)], outline=col((20, 20, 28) if hi > 0.5 else LINE, a), width=int(2.4 * u))
+            d.polygon([(gx, gy - gr), (gx + gr, gy), (gx, gy + gr), (gx - gr, gy)], outline=col(INK_ON_ACC if hi > 0.5 else LINE, a), width=int(2.4 * u))
             fsz = 46 if len(lab) < 9 else 40
             text_center(d, x, c + 75 * u, lab, sfont(FD + "Inter-Bold.otf", int(fsz * u * sc)),
-                        col((20, 20, 28) if hi > 0.5 else CREAM, a))
+                        col(INK_ON_ACC if hi > 0.5 else CREAM, a))
     elif kind == "person":
         hy = c - 140 * u
         n = 22
@@ -256,7 +264,7 @@ def draw_icon(kind, lt, dur, a, t, extra):
         tagl = Image.new("RGBA", (int(tw + 40 * u), int(th + 40 * u)), (0, 0, 0, 0))
         td = ImageDraw.Draw(tagl)
         box = (20 * u, 20 * u, 20 * u + tw, 20 * u + th)
-        td.rounded_rectangle(box, 40 * u, fill=(24, 26, 36, int(240 * a)), outline=col(LINE, a), width=int(2.6 * u))
+        td.rounded_rectangle(box, 40 * u, fill=(CARD[0], CARD[1], CARD[2], int(245 * a)), outline=col(LINE, a), width=int(2.6 * u))
         td.ellipse((50 * u, 50 * u, 74 * u, 74 * u), outline=col(LINE, a), width=int(2.4 * u))
         text_center(td, 20 * u + tw / 2, 20 * u + th / 2, "Нуман", sfont(FD + "InterDisplay-Bold.otf", 120 * u), col(GOLD, a))
         tagl = tagl.rotate(math.degrees(sw), resample=Image.BICUBIC, expand=True)
@@ -309,16 +317,16 @@ def draw_icon(kind, lt, dur, a, t, extra):
             ell(d, c, c, rad, rad, a * ease(q) * (0.95 - k * 0.08), w=2.2 + (1.2 if k == int(shown) - 1 else 0))
     elif kind == "dark":
         fl = 0.55 + 0.25 * math.sin(lt * 9) * math.sin(lt * 3.1)
-        glow_dot(d, c, c, 26 * u, a * fl, core=(150, 140, 170))
+        glow_dot(d, c, c, 26 * u, a * fl, core=(52, 46, 70))
         for k in range(4):
             rad = (100 + 70 * k) * u
-            rot_ellipse(d, c, c, rad, rad * 0.97, lt * 0.1 * (k + 1), a * 0.25 * (1 - k * 0.15))
+            rot_ellipse(d, c, c, rad, rad * 0.97, lt * 0.1 * (k + 1), a * 0.5 * (1 - k * 0.15))
         for i in range(40):  # creeping dark smoke dots
             rs = np.random.default_rng(100 + i)
             ang = rs.uniform(0, 6.28) + lt * 0.05
             rr = (420 - (lt * 40 + rs.uniform(0, 200)) % 300) * u
             x, y = c + rr * math.cos(ang), c + rr * math.sin(ang)
-            d.ellipse((x - 4 * u, y - 4 * u, x + 4 * u, y + 4 * u), fill=col((150, 140, 170), a * 0.35))
+            d.ellipse((x - 4 * u, y - 4 * u, x + 4 * u, y + 4 * u), fill=col((52, 46, 70), a * 0.45))
     elif kind == "atom":
         glow_dot(d, c, c, 34 * u, a)
         for k in range(3):
@@ -407,8 +415,8 @@ def draw_sub(frame, t):
     y0 = SUB_Y + rise
     lay = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     d = ImageDraw.Draw(lay)
-    d.rounded_rectangle((W / 2 - bw / 2, y0, W / 2 + bw / 2, y0 + bh), 34, fill=(8, 9, 14, int(185 * a)),
-                        outline=(255, 255, 255, int(18 * a)), width=2)
+    d.rounded_rectangle((W / 2 - bw / 2, y0, W / 2 + bw / 2, y0 + bh), 34, fill=(255, 255, 255, int(215 * a)),
+                        outline=(GOLD[0], GOLD[1], GOLD[2], int(60 * a)), width=2)
     idx = 0
     space = F_SUB.getlength(" ")
     for li, ln in enumerate(lines):
@@ -478,7 +486,7 @@ def render(fi):
     segw = (tot - gap * (n - 1)) / n
     for k in range(n):
         xa = x0 + k * (segw + gap)
-        d.rounded_rectangle((xa, 92, xa + segw, 98), 3, fill=(255, 255, 255, 40))
+        d.rounded_rectangle((xa, 92, xa + segw, 98), 3, fill=(40, 38, 52, 28))
         f = 1 if k < si else (clamp(lt / dur) if k == si else 0)
         if f > 0: d.rounded_rectangle((xa, 92, xa + max(6, segw * f), 98), 3, fill=col(GOLD, 0.9))
     return frame.convert("RGB").tobytes()
