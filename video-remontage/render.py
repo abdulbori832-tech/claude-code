@@ -15,11 +15,21 @@ F_CARD = ImageFont.truetype(FD + "Inter-Bold.otf", 46)
 F_TAG = ImageFont.truetype(FD + "InterDisplay-Bold.otf", 120)
 F_SMALL = ImageFont.truetype(FD + "Inter-Medium.otf", 30)
 
-GOLD = (146, 112, 214)   # lilac accent
-CREAM = (40, 38, 52)     # graphite text
-LINE = (92, 86, 112)     # slate lines
-CARD = (252, 251, 255)
-INK_ON_ACC = (255, 255, 255)
+# Calm dark palettes; pick with env PALETTE=ocean|dusk|moss
+PALETTES = {
+    "ocean": dict(bg0=(18, 32, 40), bg1=(9, 17, 23), acc=(128, 198, 184), text=(226, 236, 233),
+                  line=(150, 184, 180), card=(24, 42, 50), glow=(40, 84, 88), glow2=(30, 52, 66), shadow=(70, 96, 104)),
+    "dusk":  dict(bg0=(30, 28, 46), bg1=(14, 13, 25), acc=(188, 170, 226), text=(238, 234, 246),
+                  line=(172, 162, 200), card=(38, 35, 58), glow=(74, 62, 108), glow2=(44, 40, 70), shadow=(96, 88, 120)),
+    "moss":  dict(bg0=(24, 32, 28), bg1=(11, 16, 14), acc=(200, 210, 164), text=(236, 238, 228),
+                  line=(168, 180, 156), card=(32, 42, 36), glow=(66, 82, 62), glow2=(38, 50, 44), shadow=(90, 102, 90)),
+}
+PAL = PALETTES[os.environ.get("PALETTE", "ocean")]
+GOLD = PAL["acc"]
+CREAM = PAL["text"]
+LINE = PAL["line"]
+CARD = PAL["card"]
+INK_ON_ACC = PAL["bg1"]
 CX, CY = W // 2, 700          # icon centre
 TITLE_Y = 1150
 SUB_Y = 1530
@@ -101,23 +111,26 @@ def scene_at(t):
 yy, xx = np.mgrid[0:H, 0:W].astype(np.float32)
 BASE = np.zeros((H, W, 3), np.float32)
 g = yy / H
-for k, (c0, c1) in enumerate(zip((238, 237, 242), (219, 218, 226))):
+for k, (c0, c1) in enumerate(zip(PAL["bg0"], PAL["bg1"])):
     BASE[..., k] = lerp(c0, c1, g)
 r = np.sqrt((xx - CX) ** 2 + ((yy - CY) * 0.85) ** 2)
 GLOW = np.exp(-(r / 430) ** 2)[..., None]
 GLOW2 = np.exp(-(r / 900) ** 2)[..., None]
-LIL = np.array((206, 186, 245), np.float32)[None, None]
-WHITE = np.array((252, 251, 255), np.float32)[None, None]
+LIL = np.array(PAL["glow"], np.float32)[None, None]
+WHITE = np.array(PAL["glow2"], np.float32)[None, None]
 vig = np.sqrt(((xx - W / 2) / (W * 0.75)) ** 2 + ((yy - H / 2) / (H * 0.7)) ** 2)
-VIG = np.clip(1 - 0.18 * vig ** 2, 0.7, 1)[..., None]
+VIG = np.clip(1 - 0.45 * vig ** 2, 0.35, 1)[..., None]
 rng = np.random.default_rng(7)
 GRAIN = [rng.normal(0, 2.5, (H // 2, W // 2)).astype(np.float32) for _ in range(6)]
 PART = rng.random((70, 4))  # x, y, speed, size
 
 def background(t, glow_k, dark_k, bright_k):
     img = BASE * (1 - 0.28 * dark_k)
-    m1 = np.clip(GLOW * (0.28 * glow_k + 0.55 * bright_k), 0, 1)
+    m1 = np.clip(GLOW * (0.75 * glow_k + 0.25 * bright_k), 0, 1)
     img = img * (1 - m1) + LIL * m1
+    if bright_k > 0:
+        m3 = np.clip(GLOW * 0.35 * bright_k, 0, 1)
+        img = img * (1 - m3) + np.array(PAL["acc"], np.float32)[None, None] * m3
     m2 = np.clip(GLOW2 * (0.35 * (1 - dark_k) + 0.4 * bright_k), 0, 1)
     img = img * (1 - m2) + WHITE * m2
     img = img * VIG
@@ -317,7 +330,7 @@ def draw_icon(kind, lt, dur, a, t, extra):
             ell(d, c, c, rad, rad, a * ease(q) * (0.95 - k * 0.08), w=2.2 + (1.2 if k == int(shown) - 1 else 0))
     elif kind == "dark":
         fl = 0.55 + 0.25 * math.sin(lt * 9) * math.sin(lt * 3.1)
-        glow_dot(d, c, c, 26 * u, a * fl, core=(52, 46, 70))
+        glow_dot(d, c, c, 26 * u, a * fl, core=PAL["shadow"])
         for k in range(4):
             rad = (100 + 70 * k) * u
             rot_ellipse(d, c, c, rad, rad * 0.97, lt * 0.1 * (k + 1), a * 0.5 * (1 - k * 0.15))
@@ -326,7 +339,7 @@ def draw_icon(kind, lt, dur, a, t, extra):
             ang = rs.uniform(0, 6.28) + lt * 0.05
             rr = (420 - (lt * 40 + rs.uniform(0, 200)) % 300) * u
             x, y = c + rr * math.cos(ang), c + rr * math.sin(ang)
-            d.ellipse((x - 4 * u, y - 4 * u, x + 4 * u, y + 4 * u), fill=col((52, 46, 70), a * 0.45))
+            d.ellipse((x - 4 * u, y - 4 * u, x + 4 * u, y + 4 * u), fill=col(PAL["shadow"], a * 0.5))
     elif kind == "atom":
         glow_dot(d, c, c, 34 * u, a)
         for k in range(3):
@@ -415,8 +428,8 @@ def draw_sub(frame, t):
     y0 = SUB_Y + rise
     lay = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     d = ImageDraw.Draw(lay)
-    d.rounded_rectangle((W / 2 - bw / 2, y0, W / 2 + bw / 2, y0 + bh), 34, fill=(255, 255, 255, int(215 * a)),
-                        outline=(GOLD[0], GOLD[1], GOLD[2], int(60 * a)), width=2)
+    d.rounded_rectangle((W / 2 - bw / 2, y0, W / 2 + bw / 2, y0 + bh), 34, fill=(PAL["bg1"][0], PAL["bg1"][1], PAL["bg1"][2], int(200 * a)),
+                        outline=(GOLD[0], GOLD[1], GOLD[2], int(45 * a)), width=2)
     idx = 0
     space = F_SUB.getlength(" ")
     for li, ln in enumerate(lines):
@@ -486,7 +499,7 @@ def render(fi):
     segw = (tot - gap * (n - 1)) / n
     for k in range(n):
         xa = x0 + k * (segw + gap)
-        d.rounded_rectangle((xa, 92, xa + segw, 98), 3, fill=(40, 38, 52, 28))
+        d.rounded_rectangle((xa, 92, xa + segw, 98), 3, fill=(255, 255, 255, 30))
         f = 1 if k < si else (clamp(lt / dur) if k == si else 0)
         if f > 0: d.rounded_rectangle((xa, 92, xa + max(6, segw * f), 98), 3, fill=col(GOLD, 0.9))
     return frame.convert("RGB").tobytes()
