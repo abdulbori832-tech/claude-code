@@ -187,7 +187,264 @@ def arc_pts(cx, cy, rx, ry, a0, a1, n=80):
     return [(cx + rx * math.cos(a0 + (a1 - a0) * i / n), cy + ry * math.sin(a0 + (a1 - a0) * i / n)) for i in range(n + 1)]
 
 
+import characters as C
+
+USE_CHARS = os.environ.get("CHARS", "1") != "0"
+CHAR_KINDS = {"sun", "canopy", "canopy_full", "scales", "sprout", "mosque", "two", "turn", "hands", "eye"}
+
+
+def crescent(lay, cx, cy, r, color, a):
+    m = Image.new("L", (int(2 * r) + 4, int(2 * r) + 4), 0)
+    md = ImageDraw.Draw(m)
+    md.ellipse((2, 2, 2 * r + 2, 2 * r + 2), fill=int(255 * a))
+    md.ellipse((2 - 0.42 * r, 2 - 0.12 * r, 2 * r + 2 - 0.42 * r, 2 * r + 2 - 0.12 * r), fill=0)
+    solid = Image.new("RGBA", m.size, tuple(int(v) for v in color) + (255,))
+    solid.putalpha(m)
+    lay.alpha_composite(solid, (int(cx - r - 2), int(cy - r - 2)))
+
+
+def draw_chars(kind, lt, dur, a):
+    S = IW * SS
+    lay = Image.new("RGBA", (S, S), (0, 0, 0, 0))
+    fl = Image.new("RGBA", (S, S), (0, 0, 0, 0))
+    d, fd = ImageDraw.Draw(lay), ImageDraw.Draw(fl)
+    c, u = S / 2, SS
+    lw = int(2.4 * u)
+    ph = clamp(lt / max(dur, 0.1))
+    FIG = tuple(int(v) for v in mix(ACC, (255, 250, 240), 0.55))
+    DIM = tuple(int(v) for v in mix(LINE, (0, 0, 0), 0.25))
+    ground = c + 260 * u
+
+    if kind == "sun":
+        y = c - 200 * u + (1 - ease(lt / 3.5)) * -50 * u
+        rad = (85 + 25 * ease(lt / 3.5)) * u
+        for k in range(8, 0, -1):
+            rr = rad * (1 + k * 0.13)
+            d.ellipse((c - rr, y - rr, c + rr, y + rr), fill=col(WARM, a * 0.04))
+        d.ellipse((c - rad, y - rad, c + rad, y + rad), fill=col(WARM, a))
+        for k in range(3):
+            f = (lt * 0.5 + k / 3) % 1
+            rr = rad * (1.1 + 1.0 * f)
+            d.ellipse((c - rr, y - rr, c + rr, y + rr), outline=col(WARM, a * (1 - f) * 0.5), width=lw)
+        hz = ground + 40 * u
+        d.line((c - 440 * u, hz, c + 440 * u, hz), fill=col(LINE, a * 0.5), width=lw)
+        for i in range(9):
+            x = c + (i - 4) * 98 * u
+            sway = 0.05 * math.sin(lt * 1.2 + i)
+            arms = C.ARMS_SHADE if i % 3 == 0 else C.ARMS_DOWN
+            C.figure(fd, x, hz, (175 + 12 * ((i * 5) % 3)) * u, DIM, a * 0.9, facing=1 if i % 2 else -1,
+                     lean=sway, head_down=0.0 if i % 3 == 0 else 0.35, front=arms[0], back=arms[1])
+        lay.alpha_composite(C.glow_layer(fl, 0.5))
+        return lay.resize((IW, IW), Image.LANCZOS)
+
+    if kind in ("canopy", "canopy_full"):
+        full = kind == "canopy_full"
+        top = c - 330 * u
+        arcw, arch = 330 * u * ease(lt / 0.9), 230 * u
+        for k in range(6, 0, -1):
+            pts = arc_pts(c, top + arch, arcw * (1 + k * 0.06), arch * (1 + k * 0.08), math.pi, 2 * math.pi)
+            d.polygon(pts + [(c + arcw, ground), (c - arcw, ground)], fill=col(ACC, a * 0.03))
+        d.line(arc_pts(c, top + arch, arcw, arch, math.pi, 2 * math.pi), fill=col(ACC, a), width=int(3 * u), joint="curve")
+        gdot(d, c, top + 10 * u, 22 * u, a)
+        if full:
+            for i in range(28):
+                ang = math.pi + math.pi * (i + 0.5) / 28
+                l0, l1 = arch * 1.08, arch * (1.3 + 0.15 * math.sin(lt * 2 + i))
+                d.line((c + l0 * 1.35 * math.cos(ang), top + arch + l0 * math.sin(ang),
+                        c + l1 * 1.35 * math.cos(ang), top + arch + l1 * math.sin(ang)), fill=col(ACC, a * 0.4), width=int(2 * u))
+        shown = 7 if full else clamp((lt - 0.8) / 2.6) * 7
+        for i in range(7):
+            q = 1.0 if full else clamp(shown - i)
+            if q <= 0:
+                continue
+            x = c + (i - 3) * 92 * u
+            arms = C.ARMS_DUA if full else C.ARMS_DOWN
+            C.figure(fd, x, ground - (1 - ease(q)) * 30 * u + (4 * u * math.sin(lt * 2 + i) if full else 0),
+                     (170 + 14 * (i % 2)) * u, FIG, a * ease(q), facing=1 if i < 3 else -1,
+                     head_down=0.1, front=arms[0], back=arms[1])
+        if not full:
+            for i in range(10):
+                side = -1 if i % 2 else 1
+                x = c + side * (300 + 30 * (i // 2)) * u
+                yb = ground + (70 + 25 * (i // 2)) * u
+                C.figure(d, x, yb, 120 * u, DIM, a * 0.35, facing=-side, head_down=0.4)
+        lay.alpha_composite(C.glow_layer(fl, 1.3))
+        return lay.resize((IW, IW), Image.LANCZOS)
+
+    if kind == "scales":
+        ang = 0.28 * math.exp(-lt * 0.9) * math.cos(lt * 3.2)
+        top, L = c - 360 * u, 170 * u
+        d.line((c, top - 30 * u, c, top + 30 * u), fill=col(LINE, a), width=lw)
+        gdot(d, c, top - 40 * u, 12 * u, a)
+        for side in (-1, 1):
+            ex, ey = c + side * L * math.cos(ang), top + side * L * math.sin(ang)
+            d.line((c, top, ex, ey), fill=col(LINE, a), width=lw)
+            py = ey + 95 * u
+            d.line((ex, ey, ex - 45 * u, py), fill=col(LINE, a * 0.7), width=int(2 * u))
+            d.line((ex, ey, ex + 45 * u, py), fill=col(LINE, a * 0.7), width=int(2 * u))
+            d.chord((ex - 60 * u, py - 22 * u, ex + 60 * u, py + 22 * u), 0, 180, fill=col(CARD, a), outline=col(ACC, a), width=lw)
+        d.rounded_rectangle((c - 130 * u, ground - 40 * u, c + 130 * u, ground), 10 * u, fill=col(CARD, a), outline=col(LINE, a * 0.7), width=lw)
+        C.figure(fd, c, ground - 40 * u, 320 * u, FIG, a, facing=1, front=(1.15, 0.25), back=(-1.15, -0.25))
+        for side in (-1, 1):
+            C.figure(fd, c + side * 320 * u, ground + 30 * u, 230 * u, FIG, a * 0.85, facing=-side, head_down=0.1)
+            f = (lt * 0.45) % 1
+            hx0, hy0 = C.hand_pos(c, ground - 40 * u, 320 * u, 1, 0, (1.15, 0.25) if side > 0 else (-1.15, -0.25))
+            tx, ty = c + side * 300 * u, ground - 120 * u
+            gdot(d, lerp(hx0, tx, ease(f)), lerp(hy0, ty, ease(f)) - math.sin(f * math.pi) * 60 * u, 12 * u, a * (1 - f * 0.6))
+        lay.alpha_composite(C.glow_layer(fl, 1.3))
+        return lay.resize((IW, IW), Image.LANCZOS)
+
+    if kind == "sprout":
+        g = ease(lt / max(dur * 0.7, 1))
+        h = (220 + 90 * g) * u
+        x = c - 70 * u
+        d.rounded_rectangle((c - 260 * u, ground - 6 * u, c + 200 * u, ground + 10 * u), 8 * u, fill=col(CARD, a), outline=col(ACC, a * 0.5), width=int(2 * u))
+        arch = arc_pts(c + 280 * u, c - 120 * u, 110 * u, 150 * u, math.pi, 2 * math.pi)
+        d.line(arch + [(c + 390 * u, ground), (c + 170 * u, ground), arch[0]], fill=col(LINE, a * 0.5), width=lw)
+        C.figure(fd, x, ground, h, FIG, a, facing=1, mode="sit", lean=0.12, head_down=0.35, front=C.ARMS_READ[0], back=C.ARMS_READ[1])
+        bx, by = C.hand_pos(x, ground, h, 1, 0.12, C.ARMS_READ[0], mode="sit")
+        bw = 0.13 * h
+        for side in (-1, 1):
+            d.polygon([(bx, by - 0.02 * h), (bx + side * bw, by - 0.06 * h), (bx + side * bw, by + 0.05 * h), (bx, by + 0.07 * h)],
+                      fill=col(CARD, a), outline=col(ACC, a))
+        for k in range(8):
+            f = (lt * 0.35 + k / 8) % 1
+            px = bx + 40 * u * math.sin(k * 2.1 + lt) * f
+            gdot(d, px, by - 20 * u - 380 * u * f, (7 - 4 * f) * u, a * (1 - f))
+        lay.alpha_composite(C.glow_layer(fl, 1.3))
+        return lay.resize((IW, IW), Image.LANCZOS)
+
+    if kind == "mosque":
+        mx, bw = c - 205 * u, 130 * u
+        d.line((mx - bw, ground, mx + bw, ground), fill=col(LINE, a), width=lw)
+        for sx in (-1, 1):
+            d.line((mx + sx * bw * 0.8, ground, mx + sx * bw * 0.8, c - 20 * u), fill=col(LINE, a), width=lw)
+        d.line(arc_pts(mx, c - 20 * u, bw * 0.8, 150 * u, math.pi, 2 * math.pi), fill=col(ACC, a), width=int(3 * u), joint="curve")
+        d.line((mx, c - 170 * u, mx, c - 215 * u), fill=col(ACC, a), width=lw)
+        d.line((mx - bw - 30 * u, ground, mx - bw - 30 * u, c - 160 * u), fill=col(LINE, a * 0.8), width=lw)
+        d.polygon([(mx - bw - 45 * u, c - 160 * u), (mx - bw - 15 * u, c - 160 * u), (mx - bw - 30 * u, c - 215 * u)], outline=col(LINE, a * 0.8))
+        d.rounded_rectangle((mx - 45 * u, ground - 120 * u, mx + 45 * u, ground), 45 * u, outline=col(LINE, a * 0.8), width=lw)
+        x = c + lerp(110, 270, ph) * u
+        info = C.figure(fd, x, ground, 300 * u, FIG, a, facing=1, mode="walk", phase=lt * 3.2, head_down=0.05)
+        hx, hy = info["chest"]
+        dome = (mx, c - 175 * u)
+        pts = []
+        for i in range(41):
+            s_ = i / 40
+            px = lerp(hx, dome[0], s_)
+            py = lerp(hy, dome[1], s_) - math.sin(s_ * math.pi) * 170 * u
+            pts.append((px, py))
+        d.line(pts, fill=col(ACC, a * 0.55), width=int(2 * u), joint="curve")
+        for k in range(3):
+            s_ = (lt * 0.3 + k / 3) % 1
+            gdot(d, *pts[int(s_ * 40)], 8 * u, a * 0.9)
+        hb = 1 + 0.18 * abs(math.sin(lt * 3.4))
+        gdot(fd, hx, hy, 15 * u * hb, a)
+        lay.alpha_composite(C.glow_layer(fl, 1.3))
+        return lay.resize((IW, IW), Image.LANCZOS)
+
+    if kind == "two":
+        h = 290 * u
+        if ph < 0.35:
+            k = ease(ph / 0.35); off = lerp(330, 82, k); facing_in = True; walking = True; arm = C.ARMS_DOWN
+        elif ph < 0.62:
+            off = 82; facing_in = True; walking = False
+            r_ = ease((ph - 0.35) / 0.08)
+            arm = ((lerp(0.12, 1.2, r_), lerp(0.08, 0.15, r_)), (-0.1, 0.06))
+        else:
+            k = ease((ph - 0.62) / 0.38); off = lerp(82, 300, k); facing_in = False; walking = True; arm = C.ARMS_DOWN
+        chests = []
+        for side in (-1, 1):
+            fcg = -side if facing_in else side
+            info = C.figure(fd, c + side * off * u, ground, h, FIG, a, facing=fcg, mode="walk" if walking else "stand",
+                            phase=lt * 3.4 + (0 if side < 0 else math.pi), front=arm[0], back=arm[1])
+            chests.append(info["chest"])
+        if ph >= 0.35:
+            q = ease((ph - 0.35) / 0.1)
+            d.line((chests[0][0], chests[0][1], chests[1][0], chests[1][1]), fill=col(ACC, a * 0.6 * q), width=int(2.5 * u))
+            for ch in chests:
+                gdot(fd, ch[0], ch[1], 11 * u * q, a)
+        if 0.38 < ph < 0.62:
+            q = math.sin((ph - 0.38) / 0.24 * math.pi)
+            hy = C.hand_pos(c - 82 * u, ground, h, 1, 0, arm[0])[1]
+            gdot(d, c, hy, 40 * u * q, a * q * 0.7)
+        gdot(d, c, c - 330 * u, 16 * u, a)
+        for ch in chests:
+            d.line((c, c - 315 * u, ch[0], ch[1]), fill=col(ACC, a * 0.18), width=int(2 * u))
+        lay.alpha_composite(C.glow_layer(fl, 1.3))
+        return lay.resize((IW, IW), Image.LANCZOS)
+
+    if kind == "turn":
+        dx = c - 300 * u
+        door = (dx - 90 * u, ground - 330 * u, dx + 90 * u, ground)
+        for k in range(5, 0, -1):
+            g = k * 14 * u
+            d.rounded_rectangle((door[0] - g, door[1] - g, door[2] + g, door[3]), 90 * u + g, fill=col(SHADOW, a * 0.05))
+        d.rounded_rectangle(door, 90 * u, fill=col(SHADOW, a * 0.25), outline=col(SHADOW, a * 0.8), width=lw)
+        stop_t, walk_t = 0.45, 0.68
+        calling = 1 - ease((ph - stop_t) / 0.1)
+        for k in range(3):
+            f = (lt * 0.5 + k / 3) % 1
+            rr = (60 + 260 * f) * u
+            d.arc((dx - rr, ground - 165 * u - rr, dx + rr, ground - 165 * u + rr), -50, 50, fill=col(SHADOW, a * (1 - f) * 0.7 * calling), width=lw)
+        lx = c + 390 * u
+        bright = ease((ph - walk_t) / 0.3)
+        gdot(d, lx, ground - 170 * u, (18 + 22 * bright) * u, a)
+        if ph < stop_t:
+            C.figure(fd, c + 60 * u, ground, 320 * u, FIG, a, facing=-1)
+        elif ph < walk_t:
+            r_ = ease((ph - stop_t) / 0.08)
+            arm = (lerp(0.12, C.ARM_STOP[0][0], r_), lerp(0.08, C.ARM_STOP[0][1], r_))
+            C.figure(fd, c + 60 * u, ground, 320 * u, FIG, a, facing=-1, front=arm, back=C.ARM_STOP[1])
+        else:
+            k = ease((ph - walk_t) / (1 - walk_t))
+            C.figure(fd, c + lerp(60, 250, k) * u, ground, 320 * u, FIG, a, facing=1, mode="walk", phase=lt * 3.2)
+        lay.alpha_composite(C.glow_layer(fl, 1.0 + 0.6 * bright))
+        return lay.resize((IW, IW), Image.LANCZOS)
+
+    if kind == "hands":
+        gx, rx = c - 140 * u, c + 200 * u
+        for yy in range(-330, 260, 26):
+            d.line((c - 330 * u, c + yy * u, c - 330 * u, c + (yy + 13) * u), fill=col(LINE, a * 0.35), width=int(2 * u))
+        C.figure(fd, gx, ground, 310 * u, FIG, a, facing=1, lean=0.25, head_down=0.15, front=C.ARM_GIVE[0], back=C.ARM_GIVE[1])
+        recv = ((1.1, 0.35), (-0.1, 0.06))
+        C.figure(fd, rx, ground, 240 * u, FIG, a * 0.85, facing=-1, mode="sit", lean=0.05, front=recv[0], back=recv[1])
+        h0 = C.hand_pos(gx, ground, 310 * u, 1, 0.25, C.ARM_GIVE[0])
+        h1 = C.hand_pos(rx, ground, 240 * u, -1, 0.05, recv[0], mode="sit")
+        f = (lt * 0.45) % 1
+        x_ = lerp(h0[0], h1[0], ease(f)); y_ = lerp(h0[1], h1[1], ease(f)) - math.sin(f * math.pi) * 40 * u
+        gdot(fd, x_, y_, 12 * u, a)
+        lay.alpha_composite(C.glow_layer(fl, 1.3))
+        return lay.resize((IW, IW), Image.LANCZOS)
+
+    if kind == "eye":
+        crescent(lay, c + 270 * u, c - 300 * u, 60 * u, FIG, a)
+        for i in range(14):
+            rs = np.random.default_rng(40 + i)
+            sx, sy = c + rs.uniform(-420, 420) * u, c + rs.uniform(-430, -120) * u
+            tw = 0.4 + 0.6 * abs(math.sin(lt * 1.5 + i))
+            d.ellipse((sx - 3 * u, sy - 3 * u, sx + 3 * u, sy + 3 * u), fill=col(FIG, a * tw))
+        d.rounded_rectangle((c - 230 * u, ground - 4 * u, c + 170 * u, ground + 12 * u), 6 * u, fill=col(CARD, a), outline=col(ACC, a * 0.6), width=int(2 * u))
+        x = c - 40 * u
+        info = C.figure(fd, x, ground, 300 * u, FIG, a, facing=1, mode="sit", lean=0.06, head_down=0.3,
+                        front=C.ARMS_DUA[0], back=C.ARMS_DUA[1])
+        hx, hy = info["head"]
+        for k in range(3):
+            f = ((lt - 1.0) * 0.5 + k / 3) % 1 if lt > 1.0 else -1
+            if f < 0:
+                continue
+            ty = hy + 25 * u + 230 * u * f ** 1.5
+            s_ = 9 * u
+            tx = hx + 30 * u
+            fd.polygon([(tx, ty - s_ * 1.9), (tx + s_, ty), (tx - s_, ty)], fill=col(ACC, a * (1 - f)))
+            fd.ellipse((tx - s_, ty - s_, tx + s_, ty + s_), fill=col(ACC, a * (1 - f)))
+        lay.alpha_composite(C.glow_layer(fl, 1.3))
+        return lay.resize((IW, IW), Image.LANCZOS)
+
+
 def draw_icon(kind, lt, dur, a):
+    if USE_CHARS and kind in CHAR_KINDS:
+        return draw_chars(kind, lt, dur, a)
     S = IW * SS
     lay = Image.new("RGBA", (S, S), (0, 0, 0, 0))
     d = ImageDraw.Draw(lay)
@@ -399,10 +656,10 @@ def render(fi):
     R.particles(d, t, 1.0)
     if 1 <= num <= 7:  # huge faint numeral behind the icon
         nl = Image.new("RGBA", (W, 760), (0, 0, 0, 0))
-        R.text_center(ImageDraw.Draw(nl), W / 2, 380, str(num), F_NUM, col(ACC, 0.10 * a))
+        R.text_center(ImageDraw.Draw(nl), W / 2, 380, str(num), F_NUM, col(ACC, 0.055 * a))
         frame.alpha_composite(nl, (0, R.CY - 380 - int((1 - ease(lt / 0.6)) * 40)))
     icon = draw_icon(kind, lt, dur, a)
-    zoom = 0.9 + 0.1 * ease(lt / 0.6) + 0.03 * clamp(lt / dur)
+    zoom = (0.9 + 0.1 * ease(lt / 0.6) + 0.03 * clamp(lt / dur)) * (1.18 if USE_CHARS and kind in CHAR_KINDS else 1.0)
     sz = int(IW * zoom)
     frame.alpha_composite(icon.resize((sz, sz), Image.BICUBIC), (int(R.CX - sz / 2), int(R.CY - sz / 2 + 8 * math.sin(t * 1.3))))
     ti = R.title_img(title)
