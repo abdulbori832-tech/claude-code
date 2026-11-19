@@ -62,7 +62,7 @@ def estimate_timings():
 
 TP = os.path.join(HERE, "timings.json")
 TIMES = json.load(open(TP))["segments"] if os.path.exists(TP) and not os.environ.get("SEVEN_NO_TIMINGS") else estimate_timings()
-DUR = TIMES[-1][1] + 1.6
+DUR = TIMES[-1][1] + 2.6
 NF = int(DUR * FPS)
 # scene boundaries: each scene runs from its speech start (minus lead) to next speech start
 SCENES = []
