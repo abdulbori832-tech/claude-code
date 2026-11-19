@@ -102,7 +102,7 @@ def glow_layer(lay, strength=1.0, radius=10):
 ARMS_DOWN = ((0.12, 0.08), (-0.1, 0.06))
 ARMS_DUA = ((0.55, 2.05), (0.4, 2.1))           # hands raised in front of the chest
 ARM_STOP = ((1.3, 1.15), (-0.1, 0.06))           # palm forward: "stop"
-ARM_GIVE = ((0.95, 0.35), (-0.55, -1.2))           # front arm out and down, back arm behind the back
+ARM_GIVE = ((0.95, 0.35), (-0.28, -0.12))         # front arm out and down, other arm hangs hidden at the side
 ARMS_SHADE = ((2.2, 1.75), (-0.08, 0.06))          # hand above the eyes
 ARMS_READ = ((0.45, 1.45), (0.35, 1.5))            # holding a book
 ARM_REACH = ((1.25, 0.15), (-0.1, 0.06))           # handshake reach

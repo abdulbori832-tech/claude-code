@@ -435,9 +435,6 @@ def ill_charity(cv, lt, dur, a):
     cv.md.ellipse((S_(x - 14), S_(y - 14), S_(x + 14), S_(y + 14)), fill=255)
     cv.flush_gold(a)
     cv.glow_dot(x, y, 4, a)
-    # the hidden left hand: a soft veil behind the giver
-    for k in range(6):
-        cv.d.rectangle((S_(gx - 230 + k * 10), S_(GY - 420), S_(gx - 120), S_(GY)), fill=(10, 8, 22, int(18 * a)))
 
 
 def ill_night(cv, lt, dur, a):
