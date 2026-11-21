@@ -1,0 +1,33 @@
+{
+ "source": "user voice recording (alignment by 6 long pauses, +0.5s lead; recording is cut mid-word at the end)",
+ "segments": [
+  [
+   0.5,
+   5.8
+  ],
+  [
+   6.65,
+   14.53
+  ],
+  [
+   15.25,
+   25.88
+  ],
+  [
+   26.5,
+   36.65
+  ],
+  [
+   37.5,
+   41.65
+  ],
+  [
+   42.12,
+   46.62
+  ],
+  [
+   47.33,
+   50.0
+  ]
+ ]
+}

@@ -19,6 +19,7 @@ from render_seven import SEGMENTS, TIMES, SCENES, DUR  # shared timeline
 
 W, H, FPS = 1080, 1920, 30
 NF = int(DUR * FPS)
+TOTAL = 7  # items in the counter "01 / 07"
 FONTS = os.path.abspath(os.path.join(HERE, "..", "..", "fonts"))
 INTER = "/usr/share/fonts/opentype/inter/"
 
@@ -570,7 +571,7 @@ def render(fi):
     if num:
         ca = ease(lt / 0.4) * (1 - out_k)
         c1 = gold_text(f"0{num}", F_CNT, tracking=2, glow=0.35)
-        c2 = plain_text("/ 07", F_CNT_S, (214, 178, 112, 255))
+        c2 = plain_text(f"/ {TOTAL:02d}", F_CNT_S, (214, 178, 112, 255))
         put(frame, c1, W / 2 - 30, 190, ca)
         put(frame, c2, W / 2 + 48, 202, ca)
     return frame.convert("RGB").tobytes()
