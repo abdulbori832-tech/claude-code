@@ -1,10 +1,10 @@
 # Horror Shorts template
 
-Vertical English horror shorts: flat 2D cut-out characters in a dark three.js world (fog, flashlight, flickering
-tube lamps, film grain), one-word captions, fully synthesised horror sound design.
+Vertical English horror shorts: flat 2D cut-out characters in a colourful night-time three.js toon world (ink outlines,
+painted textures, warm glowing lamps, fog, flashlight, flicker, film grain), one-word captions, fully synthesised horror sound design.
 
 - `studio/` — Remotion 4 + three.js project. Engine in `src/engine/`, shorts in `src/shorts/<name>/`.
-  Demo: `Mannequins` ("Eleven Mannequins", 21 s). `npm install`, then `npx remotion studio src/index.ts`.
+  Demos: `MannequinsToon` (main colourful toon look) and `Mannequins` (dark look), "Eleven Mannequins", 21 s. `npm install`, then `npx remotion studio src/index.ts`.
 - `tools/` — `voice_words.py` (word timings with faster-whisper), `horror_sfx.py` (sound bed + mix, −14 LUFS),
   `qa.py` (checks), `draft_voice.py` (draft TTS for pacing only).
 - `CLAUDE.md` — workflow for Claude Code (commands «Установи», «Придумай темы», «Сделай ролик», «Поправь»).
