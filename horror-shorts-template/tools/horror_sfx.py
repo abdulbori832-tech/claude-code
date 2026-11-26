@@ -1,6 +1,7 @@
 """Horror sound bed + mix. Usage: python horror_sfx.py cues.json voice.wav out_mix.wav
 cues.json: {"duration": s, "drone": [a,b], "hum": [a,b], "steps": [a,b], "flicker": [[a,b],...], "heartbeat": [a,b],
-            "ticks": [t,...], "paper": [t,...], "beep": [t,...], "riser": [a,b], "impact": t, "sting": t}
+            "ticks": [t,...], "paper": [t,...], "beep": [t,...], "riser": [a,b], "impact": t, "sting": t,
+            "clock": [a,b], "dings": [[t,freq],...], "slides": [[a,b],...], "motor": [a,b]}
 Everything is synthesised here: no third-party sound files, no licences to worry about."""
 import json, os, sys, subprocess, tempfile, numpy as np
 from scipy.io import wavfile
@@ -75,6 +76,26 @@ if "sting" in cues:
     t0 = cues["sting"]; t = tt(3.0)
     s = sum(np.sin(2 * np.pi * f * t) for f in (55, 58.3, 82.4)) * np.exp(-t * 1.2)
     put(s, t0, 0.5)
+
+if "clock" in cues:  # wall clock tick-tock
+    a, b = cues["clock"]; t0 = a; k = 0
+    while t0 < b:
+        tk = bp(rng.standard_normal(int(0.03 * SR)), 1800 if k % 2 else 1200, 5000) * np.exp(-tt(0.03) * 140)
+        put(tk, t0, 0.35, -0.4); t0 += 0.5; k += 1
+for t0, fr in cues.get("dings", []):  # bells: desk bell, elevator chimes
+    t = tt(2.0)
+    d = (np.sin(2 * np.pi * fr * t) + 0.4 * np.sin(2 * np.pi * fr * 2.76 * t) * np.exp(-t * 6)) * np.exp(-t * 2.5)
+    put(d, t0, 0.22)
+for a, b in cues.get("slides", []):  # sliding doors / metal scrape
+    t = tt(b - a); env = np.sin(np.pi * t / t[-1]) ** 1.5
+    sl = bp(rng.standard_normal(len(t)), 300, 2500) * env + np.sin(2 * np.pi * 90 * t) * env * 0.3
+    put(sl, a, 0.35)
+if "motor" in cues:  # elevator motor, pitch rising
+    a, b = cues["motor"]; t = tt(b - a)
+    fr = 48 + 30 * t / t[-1]
+    m = np.sin(2 * np.pi * np.cumsum(fr) / SR) + 0.4 * np.sin(2 * np.pi * np.cumsum(fr * 2.02) / SR)
+    m = m * (0.6 + 0.4 * np.sin(2 * np.pi * 7 * t)) + lp(rng.standard_normal(len(t)), 500) * 0.3
+    put(fade(m, 0.4, 0.3), a, 0.28)
 
 bed = np.stack([L, R], 1)
 # voice with a short dark room reverb

@@ -8,7 +8,8 @@
 ## Где что лежит
 - `studio/` — видеостудия (Remotion + three.js). Движок: `studio/src/engine/` (персонажи, свет, камера, субтитры).
   Каждый ролик — папка `studio/src/shorts/<имя>/Short.tsx` + `studio/public/<имя>/` (voice.wav, words.json, cues.json, mix.wav).
-  Пример готового ролика: `shorts/mannequins-toon` (основной стиль, «Eleven Mannequins»); тёмная версия — `shorts/mannequins`.
+  Главный пример — `shorts/floor13` («The Thirteenth Floor», 42 с, стиль Dark Toon: 3 локации, 19 планов, рука на кнопке,
+  табло этажей, скример). Короткие примеры: `shorts/mannequins-toon` (toon), `shorts/mannequins` (dark).
 - `tools/` — `voice_words.py` (тайминг слов), `horror_sfx.py` (звук и сведение), `qa.py` (проверка), `draft_voice.py` (черновой голос).
 - `Озвучка/` — сюда клиент кладёт mp3/wav и, по желанию, .txt с текстом. `Готовые ролики/` — результат.
 - Для работы студии на компьютере: `~/horror-studio` (копия `studio/` латиницей, без пробелов), Python-окружение `~/hs-venv`.
@@ -19,7 +20,7 @@
 2. `python3 -m venv ~/hs-venv` и `pip install faster-whisper soundfile numpy scipy`; скачать модель:
    `python -c "from faster_whisper import WhisperModel; WhisperModel('small.en', device='cpu', compute_type='int8')"`.
 3. Скопировать `studio/` в `~/horror-studio`, там `npm install`.
-4. Проверочный кадр: в `~/horror-studio` `npx remotion still src/index.ts MannequinsToon out/check.png --frame=560 --scale=0.5`.
+4. Проверочный кадр: в `~/horror-studio` `npx remotion still src/index.ts Floor13 out/check.png --frame=560 --scale=0.5`.
    Показать клиенту. Ответ: «Установка готова. Напишите «Придумай темы» или пришлите озвучку и напишите «Сделай ролик».»
 
 ## «Придумай темы»
@@ -38,7 +39,7 @@
 2. `python tools/voice_words.py <аудио> ~/horror-studio/public/<имя>` → voice.wav + words.json.
    Числа и сокращения в words.json привести к виду для субтитров (9 → NINE, 3 a.m. → «3 A.M.»), слову-поворту
    в конце поставить `"x": 1` (красный).
-3. Скопировать `shorts/mannequins-toon` в `shorts/<имя>`, переписать: SHOTS (планы и камера по времени слов, кадр = секунда*30),
+3. Скопировать `shorts/floor13` в `shorts/<имя>`, переписать: SHOTS (планы и камера по времени слов, кадр = секунда*30),
    набор (`Store` → свой набор из `engine/toon.tsx`: PaintedFloor/PaintedWall/OBox/WarmLamp/ToonWindow/ToonRack/Shelf/Poster/Glow + Picture), персонажей (`engine/draw.ts`:
    новые виды рисуются там же, в том же стиле), эмоции по сюжету, мигание света, финальный «скример» и затемнение.
    Зарегистрировать композицию в `src/Root.tsx`. FRAMES = длина голоса + ~1 с.
