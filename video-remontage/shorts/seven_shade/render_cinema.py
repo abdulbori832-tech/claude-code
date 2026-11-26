@@ -74,16 +74,24 @@ def rgba(c, a): return (int(c[0]), int(c[1]), int(c[2]), int(clamp(a) * 255))
 # ------------------------------------------------------------------ static sky / ground
 rng = np.random.default_rng(3)
 yy, xx = np.mgrid[0:H, 0:W].astype(np.float32)
-top, mid, low = np.array((14, 12, 40)), np.array((34, 30, 82)), np.array((52, 40, 96))
+# Sky palettes (env CINEMA_PAL). Each: sky top/mid/low, milky-way tint, horizon haze, far/near dune, star tint
+SKY_PALETTES = {
+    "violet":  ((14, 12, 40), (34, 30, 82), (52, 40, 96), (60, 52, 110), (70, 50, 60), (30, 24, 58), (16, 13, 30), (235, 230, 255)),
+    "emerald": ((6, 18, 20), (12, 40, 44), (22, 62, 60), (40, 92, 86), (70, 70, 46), (12, 34, 34), (6, 16, 17), (225, 245, 235)),
+    "dawn":    ((10, 16, 38), (28, 40, 78), (120, 82, 92), (60, 70, 120), (150, 90, 60), (40, 32, 52), (18, 14, 26), (240, 236, 255)),
+    "sand":    ((24, 20, 18), (52, 40, 34), (98, 70, 52), (90, 70, 52), (120, 80, 40), (46, 34, 28), (22, 17, 14), (255, 240, 220)),
+}
+SP = SKY_PALETTES[os.environ.get("CINEMA_PAL", "violet")]
+top, mid, low = np.array(SP[0]), np.array(SP[1]), np.array(SP[2])
 g = np.clip(yy / HZ, 0, 1)[..., None]
 SKY = np.where(g < 0.7, top + (mid - top) * (g / 0.7), mid + (low - mid) * ((g - 0.7) / 0.3)).astype(np.float32)
 # milky way: diagonal band of soft noise
 band = np.exp(-(((xx * 0.55 + yy * 0.85) - 1100) / 260) ** 2)
 noise = Image.fromarray((rng.random((H // 8, W // 8)) * 255).astype(np.uint8)).resize((W, H), Image.BICUBIC).filter(ImageFilter.GaussianBlur(18))
 nz = np.asarray(noise, np.float32) / 255
-SKY += (band * (0.5 + nz))[..., None] * np.array((60, 52, 110), np.float32) * 0.55
+SKY += (band * (0.5 + nz))[..., None] * np.array(SP[3], np.float32) * 0.55
 # horizon haze
-SKY += np.exp(-((yy - HZ) / 90) ** 2)[..., None] * np.array((70, 50, 60), np.float32)
+SKY += np.exp(-((yy - HZ) / 90) ** 2)[..., None] * np.array(SP[4], np.float32)
 SKY = np.clip(SKY, 0, 255)
 sky_img = Image.fromarray(SKY.astype(np.uint8)).convert("RGBA")
 sd = ImageDraw.Draw(sky_img)
@@ -91,7 +99,7 @@ for _ in range(900):  # static faint stars
     x, y = rng.uniform(0, W), rng.uniform(0, HZ - 20)
     b = rng.uniform(0.15, 0.6) * (1.3 if abs((x * 0.55 + y * 0.85) - 1100) < 300 else 1)
     r = rng.choice([0.6, 0.9, 1.3], p=[0.6, 0.3, 0.1])
-    sd.ellipse((x - r, y - r, x + r, y + r), fill=rgba((235, 230, 255), b))
+    sd.ellipse((x - r, y - r, x + r, y + r), fill=rgba(SP[7], b))
 TWINKLE = rng.random((90, 4))
 SKY_IMG = sky_img
 
@@ -107,8 +115,8 @@ def dune_layer(base, amp, freq, phase, color, rim=None):
     return lay.resize((W, H), Image.LANCZOS), pts
 
 
-FAR, _ = dune_layer(HZ - 6, 14, 1.4, 0.6, (30, 24, 58, 255))
-NEAR, NEAR_PTS = dune_layer(HZ + 26, 18, 1.0, 2.2, (16, 13, 30, 255), rim=(236, 200, 132, 255))
+FAR, _ = dune_layer(HZ - 6, 14, 1.4, 0.6, SP[5] + (255,))
+NEAR, NEAR_PTS = dune_layer(HZ + 26, 18, 1.0, 2.2, SP[6] + (255,), rim=(236, 200, 132, 255))
 # golden glow under the near rim
 rim_mask = Image.new("L", (W, H), 0)
 ImageDraw.Draw(rim_mask).line([(x / 2, y / 2) for x, y in NEAR_PTS], fill=255, width=6)
