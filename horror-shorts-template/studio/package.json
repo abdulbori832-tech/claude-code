@@ -1,0 +1,26 @@
+{
+  "name": "horror-shorts-studio",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Horror Shorts: 2D cut-out characters in a dark 3D world (Remotion + three.js)",
+  "scripts": {
+    "studio": "remotion studio src/index.ts",
+    "render": "remotion render src/index.ts Mannequins out/mannequins.mp4 --codec h264 --crf 16",
+    "still": "remotion still src/index.ts Mannequins out/still.png --frame=100 --scale=0.5",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@react-three/fiber": "9.1.2",
+    "@remotion/cli": "4.0.290",
+    "@remotion/three": "4.0.290",
+    "react": "19.0.0",
+    "react-dom": "19.0.0",
+    "remotion": "4.0.290",
+    "three": "0.175.0"
+  },
+  "devDependencies": {
+    "@types/react": "19.0.0",
+    "@types/three": "0.175.0",
+    "typescript": "5.8.3"
+  }
+}
